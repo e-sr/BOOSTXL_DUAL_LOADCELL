@@ -34,42 +34,11 @@
  *
  */
 /*******************************************************************************
-// ADS1220 Header File for Demo Functions 
-//                    
-//
-// Description: Use of the MSP430F5528 USCI A0 peripheral for setting up and 
-//    communicating to the ADS1220 24-bit ADC.
-//    
-//    
-//                                                   
-//                 MSP430x552x
-//             ------------------                        
-//         /|\|                  |                       
-//          | |                  |                       
-//          --|RST           P3.4|<-- MISO (DOUT)           
-//            |                  |                                         
-//            |              P3.3|--> MOSI (DIN)
-//            |                  |  
-//            |              P2.7|--> SCLK
-//            |                  | 
-//            |              P2.6|<-- INT (DRDY) 
-//            |                  | 
-//            |              P1.2|--> CS 
-//
+// ADS1220 Header File 
+
 //******************************************************************************/
 #ifndef ADS1220_H_
 #define ADS1220_H_
-/* Definition of GPIO Port Bits Used for Communication */
-/* P1.2 */
-#define ADS1220_CS      	0x04
-/* P3.3  */
-#define ADS1220_DIN     	0x08
-/* P3.4 */
-#define ADS1220_DOUT    	0x10
-/* P2.6 */
-#define ADS1220_DRDY    	0x40
-/* P2.7 */
-#define ADS1220_SCLK    	0x80
 /* Error Return Values */
 #define ADS1220_NO_ERROR           0
 #define ADS1220_ERROR				-1
@@ -81,6 +50,7 @@
 #define ADS1220_CMD_SHUTDOWN    0x02
 #define ADS1220_CMD_RESET    	0x06
 /* ADS1220 Register Definitions */
+#define ADS1220_REG_NUMBER      4
 #define ADS1220_0_REGISTER   	0x00
 #define ADS1220_1_REGISTER     	0x01
 #define ADS1220_2_REGISTER     	0x02
@@ -190,76 +160,29 @@
 #define ADS1220_IDAC2_REFN0	0x18
 /* define DRDYM (DOUT/DRDY behaviour) */
 #define ADS1220_DRDY_MODE	0x02
-/* Low Level ADS1220 Device Functions */
-void ADS1220Init(void);							/* Device initialization */
-int ADS1220WaitForDataReady(int Timeout);		/* DRDY polling */
-void ADS1220AssertCS(int fAssert);				/* Assert/deassert CS */
-void ADS1220SendByte(unsigned char cData );		/* Send byte to the ADS1220 */
-unsigned char ADS1220ReceiveByte(void);			/* Receive byte from the ADS1220 */
+
+/* ADS1220 low level device specification*/
+typedef struct _ADS1220_t_
+{
+    unsigned cs;
+    void (*assert_cs)(unsigned assert, unsigned cs);    /*function pointer to assert cs*/
+    void (*tx_byte_p)(unsigned char);                   /*function pointer to trasmit data */
+    unsigned char (*rx_byte_p)(void);                   /*function pointer to rx data */
+    long raw_data;                                      /*raw converted data */
+    unsigned reg_read[ADS1220_REG_NUMBER];
+    unsigned reg_write[ADS1220_REG_NUMBER];
+
+}ADS1220_t;
+
+void ADS1220Init(ADS1220_t *ads1220,
+                 unsigned cs,
+                 void (*assert_cs)(unsigned assert, unsigned cs),
+                 void (*tx_byte)(unsigned char),
+                 unsigned char (*rx_byte)(void));
+
 /* ADS1220 Higher Level Functions */
-long ADS1220ReadData(void);						/* Read the data results */
-void ADS1220ReadRegister(int StartAddress, int NumRegs, unsigned * pData);	/* Read the register(s) */
-void ADS1220WriteRegister(int StartAddress, int NumRegs, unsigned * pData); /* Write the register(s) */
-void ADS1220SendResetCommand(void);				/* Send a device Reset Command */
-void ADS1220SendStartCommand(void);				/* Send a Start/SYNC command */
-void ADS1220SendShutdownCommand(void);			/* Place the device in powerdown mode */
-/* Register Set Value Commands */
-void ADS1220Config(void);
-int ADS1220SetChannel(int Mux);
-int ADS1220SetGain(int Gain);
-int ADS1220SetPGABypass(int Bypass);
-int ADS1220SetDataRate(int DataRate);
-int ADS1220SetClockMode(int ClockMode);
-int ADS1220SetPowerDown(int PowerDown);
-int ADS1220SetTemperatureMode(int TempMode);
-int ADS1220SetBurnOutSource(int BurnOut);
-int ADS1220SetVoltageReference(int VoltageRef);
-int ADS1220Set50_60Rejection(int Rejection);
-int ADS1220SetLowSidePowerSwitch(int PowerSwitch);
-int ADS1220SetCurrentDACOutput(int CurrentOutput);
-int ADS1220SetIDACRouting(int IDACRoute);
-int ADS1220SetDRDYMode(int DRDYMode);
-/* Register Get Value Commands */
-int ADS1220GetChannel(void);
-int ADS1220GetGain(void);
-int ADS1220GetPGABypass(void);
-int ADS1220GetDataRate(void);
-int ADS1220GetClockMode(void);
-int ADS1220GetPowerDown(void);
-int ADS1220GetTemperatureMode(void);
-int ADS1220GetBurnOutSource(void);
-int ADS1220GetVoltageReference(void);
-int ADS1220Get50_60Rejection(void);
-int ADS1220GetLowSidePowerSwitch(void);
-int ADS1220GetCurrentDACOutput(void);
-int ADS1220GetIDACRouting(int WhichOne);
-int ADS1220GetDRDYMode(void);
-/* Useful Functions within Main Program for Setting Register Contents
-*
-*  	These functions show the programming flow based on the header definitions.
-*  	The calls are not made within the demo example, but could easily be used by calling the function
-*  		defined within the program to complete a fully useful program.
-*	Similar function calls were made in the firmware design for the ADS1220EVM.
-*  
-*  The following function calls use ASCII data sent from a COM port to control settings 
-*	on the ADS1220.  The data is reconstructed from ASCII and then combined with the
-*	register contents to save as new configuration settings.
-*
-* 	Function names correspond to datasheet register definitions
-*/
-void set_MUX(char c);
-void set_GAIN(char c);
-void set_PGA_BYPASS(char c);
-void set_DR(char c);
-void set_MODE(char c);
-void set_CM(char c);
-void set_TS(char c);
-void set_BCS(char c);
-void set_VREF(char c);
-void set_50_60(char c);
-void set_PSW(char c);
-void set_IDAC(char c);
-void set_IMUX(char c, int i);
-void set_DRDYM(char c);
-void set_ERROR(void);
+void ADS1220ReadData(ADS1220_t* ads1220);                               /* Read the data results */
+void ADS1220ReadRegister(ADS1220_t* ads1220,int StartAddress, int NumRegs); /* Read the register(s) */
+void ADS1220WriteRegister(ADS1220_t* ads1220, int StartAddress, int NumRegs); /* Write the register(s) */
+void ADS1220SendCommand(ADS1220_t* ads1220, unsigned char command);                         /* Send a device Command */
 #endif /*ADS1220_H_*/
