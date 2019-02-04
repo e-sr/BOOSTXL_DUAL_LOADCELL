@@ -33,10 +33,10 @@
  * ADS1220.h
  *
  */
-/*******************************************************************************
 // ADS1220 Header File 
 
-//******************************************************************************/
+#include <stdint.h>
+
 #ifndef ADS1220_H_
 #define ADS1220_H_
 /* Error Return Values */
@@ -161,28 +161,31 @@
 /* define DRDYM (DOUT/DRDY behaviour) */
 #define ADS1220_DRDY_MODE	0x02
 
+#define ADS1220_SPICLK_FREQ_HZ 4000000
 /* ADS1220 low level device specification*/
 typedef struct _ADS1220_t_
 {
-    unsigned cs;
-    void (*assert_cs)(unsigned assert, unsigned cs);    /*function pointer to assert cs*/
-    void (*tx_byte_p)(unsigned char);                   /*function pointer to trasmit data */
-    unsigned char (*rx_byte_p)(void);                   /*function pointer to rx data */
-    long raw_data;                                      /*raw converted data */
-    unsigned reg_read[ADS1220_REG_NUMBER];
-    unsigned reg_write[ADS1220_REG_NUMBER];
+    uint32_t cs;
+    void (*assert_cs_p)(uint16_t , uint32_t);    /*function pointer to assert cs*/
+    void (*tx_byte_p)(uint16_t);                   /*function pointer to trasmit data */
+    uint16_t (*rx_byte_p)(void);                   /*function pointer to rx data */
+    int32_t raw_data;                                      /*raw converted data */
+    uint32_t reg_read[ADS1220_REG_NUMBER];
+    uint32_t reg_write[ADS1220_REG_NUMBER];
 
 }ADS1220_t;
 
-void ADS1220Init(ADS1220_t *ads1220,
-                 unsigned cs,
-                 void (*assert_cs)(unsigned assert, unsigned cs),
-                 void (*tx_byte)(unsigned char),
-                 unsigned char (*rx_byte)(void));
+void ADS1220Init(ADS1220_t* ads1220,
+                 uint32_t cs,
+                 void (*assert_cs)(uint16_t , uint32_t),
+                 void (*tx_byte)(uint16_t),
+                 uint16_t (*rx_byte)(void));
 
 /* ADS1220 Higher Level Functions */
 void ADS1220ReadData(ADS1220_t* ads1220);                               /* Read the data results */
-void ADS1220ReadRegister(ADS1220_t* ads1220,int StartAddress, int NumRegs); /* Read the register(s) */
-void ADS1220WriteRegister(ADS1220_t* ads1220, int StartAddress, int NumRegs); /* Write the register(s) */
-void ADS1220SendCommand(ADS1220_t* ads1220, unsigned char command);                         /* Send a device Command */
+void ADS1220ReadRegister(ADS1220_t* ads1220,uint16_t StartAddress, uint16_t NumRegs); /* Read the register(s) */
+void ADS1220WriteRegister(ADS1220_t* ads1220, uint16_t StartAddress, uint16_t NumRegs); /* Write the register(s) */
+void ADS1220SendCommand(ADS1220_t* ads1220, uint16_t command);
+
+/* Send a device Command */
 #endif /*ADS1220_H_*/
