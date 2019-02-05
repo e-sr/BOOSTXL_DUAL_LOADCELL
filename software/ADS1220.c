@@ -34,85 +34,121 @@
  *
  */
 /******************************************************************************
-// ADS1220 Demo C Function Calls  
-//            
+ // ADS1220 Demo C Function Calls
+ //
  ******************************************************************************/
 #include "ADS1220.h"
 
-void ADS1220Init(ADS1220_t* ads1220,
-                 uint32_t cs,
-                 void (*assert_cs)(uint16_t , uint32_t),
-                 void (*tx_byte)(uint16_t),
-                 uint16_t (*rx_byte)(void))
+void ADS1220Init(ADS1220_t* ads1220, uint32_t cs,
+                 void (*assert_cs)(uint16_t, uint32_t),
+                 void (*tx_byte)(uint16_t), uint16_t (*rx_byte)(void))
 {
-	ads1220->cs = cs;
-	ads1220->assert_cs_p = assert_cs;
-	ads1220->tx_byte_p = tx_byte;
-	ads1220->rx_byte_p = rx_byte;
+    ads1220->cs = cs;
+    ads1220->assert_cs_p = assert_cs;
+    ads1220->tx_byte_p = tx_byte;
+    ads1220->rx_byte_p = rx_byte;
+    ads1220->offset = 0;
+    ads1220->calibration=1./0x007fffff;
+    ads1220->oc_flag = 0;
+    ads1220->oc_counter_max=0;
+    ads1220->oc_counter = 0;
+    ads1220->accumulator = 0;
 }
 /*
-******************************************************************************
+ ******************************************************************************
  higher level functions
-*/
+ */
 void ADS1220ReadData(ADS1220_t* ads1220)
 {
     int32_t data;
-   /* assert CS to start transfer */
-   ads1220->assert_cs_p(1, ads1220->cs);
-   /* send the command byte */
-   ads1220->tx_byte_p(ADS1220_CMD_RDATA);
-   /* get the conversion result */
-   data = ads1220->rx_byte_p();
-   data = (data << 8) | ads1220->rx_byte_p();
-   data = (data << 8) | ads1220->rx_byte_p();
-   /* sign extend data */
-   if (data & 0x800000){//if negative
-	   data |= 0xff000000;
-   } 
-	/* de-assert CS */
-   	ads1220->raw_data=data;
-	ads1220->assert_cs_p(0,ads1220->cs);
-   return;
+    /* assert CS to start transfer */
+    ads1220->assert_cs_p(1, ads1220->cs);
+    /* send the command byte */
+    ads1220->tx_byte_p(ADS1220_CMD_RDATA);
+    /* get the conversion result */
+    data = ads1220->rx_byte_p();
+    data = (data << 8) | ads1220->rx_byte_p();
+    data = (data << 8) | ads1220->rx_byte_p();
+    /* de-assert CS */
+    ads1220->assert_cs_p(0, ads1220->cs);
+    /* sign extend data */
+    if (data & 0x800000)
+    { //if negative
+        data |= 0xff000000;
+    }
+
+    ads1220->data = data - ads1220->offset;
+    ads1220->data_cal = ((float) ads1220->data) * ads1220->calibration;
+
+    if (ads1220->oc_flag)
+    {
+        if (ads1220->oc_counter < ads1220->oc_counter_max)
+        {
+            ads1220->accumulator += data;
+            ads1220->oc_counter++;
+        }
+        else
+        {
+            if (ads1220->oc_flag == 1)
+            {
+                ads1220->offset = (int32_t) (ads1220->accumulator
+                        / ads1220->oc_counter);
+            }
+            else
+            {
+                ads1220->calibration = 1.0f / ((ads1220->accumulator / ads1220->oc_counter)
+                                - ads1220->offset);
+            }
+            ads1220->accumulator = 0;
+            ads1220->oc_counter = 0;
+            ads1220->oc_flag = 0;
+        }
+    }
+    return;
 }
-void ADS1220ReadRegister(ADS1220_t* ads1220, uint16_t StartAddress, uint16_t NumRegs)
+void ADS1220ReadRegister(ADS1220_t* ads1220, uint16_t StartAddress,
+                         uint16_t NumRegs)
 {
     uint16_t i;
-	/* assert CS to start transfer */
-   ads1220->assert_cs_p(1, ads1220->cs);
-   /* send the command byte */
-   ads1220->tx_byte_p(ADS1220_CMD_RREG | (((StartAddress << 2) & 0x0c) | ((NumRegs - 1) & 0x03)));
-   /* get the register content */
-   for (i = StartAddress; i < StartAddress+NumRegs; i++)
-   {
-	   ads1220->reg_read[i] = ads1220->rx_byte_p();
-	}
-   	/* de-assert CS */
-	ads1220->assert_cs_p(0, ads1220->cs);
-	return;
+    /* assert CS to start transfer */
+    ads1220->assert_cs_p(1, ads1220->cs);
+    /* send the command byte */
+    ads1220->tx_byte_p(
+    ADS1220_CMD_RREG | (((StartAddress << 2) & 0x0c) | ((NumRegs - 1) & 0x03)));
+    /* get the register content */
+    for (i = StartAddress; i < StartAddress + NumRegs; i++)
+    {
+        ads1220->reg_read[i] = ads1220->rx_byte_p();
+    }
+    /* de-assert CS */
+    ads1220->assert_cs_p(0, ads1220->cs);
+    return;
 }
 
-void ADS1220WriteRegister(ADS1220_t* ads1220, uint16_t StartAddress, uint16_t NumRegs)
+void ADS1220WriteRegister(ADS1220_t* ads1220, uint16_t StartAddress,
+                          uint16_t NumRegs)
 {
     uint16_t i;
-	/* assert CS to start transfer */
-	ads1220->assert_cs_p(1, ads1220->cs);
-	/* send the command byte */
-	ads1220->tx_byte_p(ADS1220_CMD_WREG | (((StartAddress << 2) & 0x0c) | ((NumRegs - 1) & 0x03)));
-	/* get the register content */
-	for (i = StartAddress; i < StartAddress + NumRegs; i++)
-	{
-		ads1220->tx_byte_p(ads1220->reg_write[i]);
-	}
-   	/* de-assert CS */
-	ads1220->assert_cs_p(0, ads1220->cs);
-	return;
+    /* assert CS to start transfer */
+    ads1220->assert_cs_p(1, ads1220->cs);
+    /* send the command byte */
+    ads1220->tx_byte_p(
+    ADS1220_CMD_WREG | (((StartAddress << 2) & 0x0c) | ((NumRegs - 1) & 0x03)));
+    /* get the register content */
+    for (i = StartAddress; i < StartAddress + NumRegs; i++)
+    {
+        ads1220->tx_byte_p(ads1220->reg_write[i]);
+    }
+    /* de-assert CS */
+    ads1220->assert_cs_p(0, ads1220->cs);
+    return;
 }
 
 void ADS1220SendCommand(ADS1220_t* ads1220, uint16_t command)
 {
-	ads1220->assert_cs_p(1, ads1220->cs);
-	ads1220->tx_byte_p(command);
-	ads1220->assert_cs_p(0, ads1220->cs);
-	return;
+    ads1220->assert_cs_p(1, ads1220->cs);
+    ads1220->tx_byte_p(command);
+    ads1220->assert_cs_p(0, ads1220->cs);
+    return;
 }
 
